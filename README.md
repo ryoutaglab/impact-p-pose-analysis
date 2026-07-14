@@ -1,4 +1,4 @@
-# impact-pose-analysis
+# impact-p-pose-analysis
 格闘技インパクト解析ツール
 
 ## 概要
@@ -12,7 +12,7 @@ mma-pose-analysisの姉妹ツール
 - 左右重心バランス（%）
 
 ## 使い方
-python pose_analysis_impact.py 動画ファイル名
+python pose_analysis_impact-p.py 動画ファイル名
 
 ## 関連リポジトリ
 - mma-pose-analysis
