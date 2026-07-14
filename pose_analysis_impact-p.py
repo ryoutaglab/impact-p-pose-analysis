@@ -19,6 +19,9 @@ RIGHT_ANKLE    = 16
 # 解析する最大人数
 MAX_PERSONS = 2
 
+# 負荷軽減のため、姿勢推定はNフレームに1回だけ実行する（間引き）
+FRAME_SKIP = 2
+
 # スケルトン接続定義（0-indexed）
 SKELETON = [
     [15, 13], [13, 11], [16, 14], [14, 12], [11, 12],
@@ -309,6 +312,10 @@ def main():
     fps    = cap.get(cv2.CAP_PROP_FPS) or 30
     width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # 姿勢推定はFRAME_SKIPフレームに1回しか実行しないため、角速度計算に
+    # 使う実効fpsも同じ比率で下げる（動画本来のfpsのままだと経過時間を
+    # 半分に見積もり、角速度が実際の2倍に水増しされる）
+    analysis_fps = fps / FRAME_SKIP
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
@@ -345,7 +352,7 @@ def main():
 
         frame_count += 1
 
-        if frame_count % 2 == 1 or display_frame is None:
+        if frame_count % FRAME_SKIP == 1 or display_frame is None:
             results = model(frame, stream=True, verbose=False, imgsz=640)
 
             canvas = frame.copy()
@@ -388,7 +395,7 @@ def main():
                                 max_hip_rotation_angles[rank], hip_rotation_angle)
 
                         angular_velocity = update_hip_angular_velocity(
-                            hip_rotation_angle, fps, rank, prev_angles, angle_histories)
+                            hip_rotation_angle, analysis_fps, rank, prev_angles, angle_histories)
                         if angular_velocity is not None:
                             max_angular_velocities[rank] = max(
                                 max_angular_velocities[rank], angular_velocity)
