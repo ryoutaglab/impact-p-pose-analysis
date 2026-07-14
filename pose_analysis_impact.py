@@ -151,6 +151,23 @@ def compute_hip_width(kp, conf):
     return abs(kp[RIGHT_HIP][0] - kp[LEFT_HIP][0])
 
 
+def smooth_hip_width(hip_width, rank, hip_width_histories):
+    """腰幅を移動平均（ウィンドウ = hip_width_historiesのmaxlen）で平滑化する。
+    arccosはratio=1（正面向き）付近で微分値が発散し、キーポイント検出の
+    数ピクセルのジッターが角度・角速度に大きく増幅されるため、正規化前に
+    ここで抑える。バッファが埋まりきるまで（トラッキング開始直後の数フレーム）
+    はNoneを返す。ここで弾かないと、平均サンプル数が少ないままの不安定な
+    値がmax_hip_widths / Maxの角速度に混入し、動画冒頭から不当に高い
+    Max値が記録されてしまう。"""
+    if hip_width is None:
+        return None
+    hip_width_histories[rank].append(hip_width)
+    history = hip_width_histories[rank]
+    if len(history) < history.maxlen:
+        return None
+    return sum(history) / len(history)
+
+
 def compute_hip_rotation_angle(hip_width, max_hip_width):
     """腰幅を最大腰幅で正規化した水平回転角度の近似値（0°=真横、90°=正面）"""
     if hip_width is None or max_hip_width <= 0:
@@ -296,6 +313,10 @@ def main():
         deque(maxlen=10),
         deque(maxlen=10),
     ]
+    hip_width_histories = [
+        deque(maxlen=20),
+        deque(maxlen=20),
+    ]
     prev_angles = [None, None]
     max_angular_velocities  = [0.0, 0.0]
     max_hip_widths          = [0.0, 0.0]
@@ -337,10 +358,13 @@ def main():
                         balance   = compute_balance(kp, conf)
 
                         hip_width = compute_hip_width(kp, conf)
-                        if hip_width is not None:
-                            max_hip_widths[rank] = max(max_hip_widths[rank], hip_width)
+                        hip_width_smoothed = smooth_hip_width(
+                            hip_width, rank, hip_width_histories)
+                        if hip_width_smoothed is not None:
+                            max_hip_widths[rank] = max(
+                                max_hip_widths[rank], hip_width_smoothed)
                         hip_rotation_angle = compute_hip_rotation_angle(
-                            hip_width, max_hip_widths[rank])
+                            hip_width_smoothed, max_hip_widths[rank])
                         if hip_rotation_angle is not None:
                             max_hip_rotation_angles[rank] = max(
                                 max_hip_rotation_angles[rank], hip_rotation_angle)
