@@ -125,7 +125,9 @@ def select_top_persons(r, max_n):
 def update_hip_angular_velocity(hip_rotation_angle, fps, rank, prev_angles, angle_histories):
     """腰の回転角速度（°/秒）をHip Rot Angle（腰幅ベースの回転角度）の時間微分から算出し、
     直近10フレームの移動平均で平滑化する。腰幅比率は正面/真横の区別のみで左右の向きを
-    持たないため、速度は常に非負の「回転の速さ」を表す。"""
+    持たないため、速度は常に非負の「回転の速さ」を表す。移動平均バッファが埋まりきる
+    まで（最初の10サンプル）はNoneを返す。ここで弾かないと、サンプル数1〜数個の
+    ほぼ生値に近い平均が、平均化による保護なしにそのままMaxへ焼き付いてしまう。"""
     if hip_rotation_angle is None:
         return None
 
@@ -136,8 +138,11 @@ def update_hip_angular_velocity(hip_rotation_angle, fps, rank, prev_angles, angl
 
     angular_velocity = abs(hip_rotation_angle - prev_angle) * fps
 
-    angle_histories[rank].append(angular_velocity)
-    return sum(angle_histories[rank]) / len(angle_histories[rank])
+    history = angle_histories[rank]
+    history.append(angular_velocity)
+    if len(history) < history.maxlen:
+        return None
+    return sum(history) / len(history)
 
 
 def compute_hip_width(kp, conf):
