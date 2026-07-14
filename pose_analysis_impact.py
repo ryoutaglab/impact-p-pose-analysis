@@ -246,7 +246,7 @@ def color_for_balance(left_pct):
 
 
 def draw_metrics(frame, rank, width, angular_velocity, max_angular_velocity,
-                  hip_rotation_angle, body_axis, balance):
+                  hip_rotation_angle, max_hip_rotation_angle, body_axis, balance):
     """腰回転角速度・腰回転角度・体軸傾き・重心バランスを画面に数値表示する（英語表記、cv2.putTextは日本語非対応のため）"""
     label = f'P{rank + 1}'
     x = 20 if rank == 0 else width - 300
@@ -263,7 +263,8 @@ def draw_metrics(frame, rank, width, angular_velocity, max_angular_velocity,
     if hip_rotation_angle is None:
         text, color = f'{label} Hip Rot Angle: ---', GRAY
     else:
-        text  = f'{label} Hip Rot Angle: {hip_rotation_angle:.1f} deg'
+        text  = (f'{label} Hip Rot Angle: {hip_rotation_angle:.1f} deg '
+                  f'(Max {max_hip_rotation_angle:.1f} deg)')
         color = color_for_hip_rotation_angle(hip_rotation_angle)
     cv2.putText(frame, text, (x, 80), font, scale, color, thickness)
 
@@ -309,8 +310,9 @@ def main():
         deque(maxlen=10),
     ]
     prev_angles = [None, None]
-    max_angular_velocities = [0.0, 0.0]
-    max_hip_widths         = [0.0, 0.0]
+    max_angular_velocities  = [0.0, 0.0]
+    max_hip_widths          = [0.0, 0.0]
+    max_hip_rotation_angles = [0.0, 0.0]
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -355,6 +357,9 @@ def main():
                             max_hip_widths[rank] = max(max_hip_widths[rank], hip_width)
                         hip_rotation_angle = compute_hip_rotation_angle(
                             hip_width, max_hip_widths[rank])
+                        if hip_rotation_angle is not None:
+                            max_hip_rotation_angles[rank] = max(
+                                max_hip_rotation_angles[rank], hip_rotation_angle)
 
                         if angular_velocity is not None:
                             max_angular_velocities[rank] = max(
@@ -362,7 +367,7 @@ def main():
 
                         draw_metrics(canvas, rank, width,
                                      angular_velocity, max_angular_velocities[rank],
-                                     hip_rotation_angle,
+                                     hip_rotation_angle, max_hip_rotation_angles[rank],
                                      body_axis, balance)
 
             display_frame = canvas
