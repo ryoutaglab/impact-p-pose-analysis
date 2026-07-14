@@ -127,10 +127,13 @@ def select_top_persons(r, max_n):
 
 def update_hip_angular_velocity(hip_rotation_angle, fps, rank, prev_angles, angle_histories):
     """腰の回転角速度（°/秒）をHip Rot Angle（腰幅ベースの回転角度）の時間微分から算出し、
-    直近10フレームの移動平均で平滑化する。腰幅比率は正面/真横の区別のみで左右の向きを
-    持たないため、速度は常に非負の「回転の速さ」を表す。移動平均バッファが埋まりきる
-    まで（最初の10サンプル）はNoneを返す。ここで弾かないと、サンプル数1〜数個の
-    ほぼ生値に近い平均が、平均化による保護なしにそのままMaxへ焼き付いてしまう。"""
+    移動平均（ウィンドウ = angle_historiesのmaxlen）で平滑化する。腰幅比率は正面/真横の
+    区別のみで左右の向きを持たないため、速度は常に非負の「回転の速さ」を表す。
+    ウィンドウは短め（例:3フレーム）にする必要がある。長くしすぎると、パンチのような
+    一瞬(ウィンドウ時間より短い時間)で完了する速い回転ほど、前後の静止フレームと
+    平均されて大きく過小評価されてしまう。移動平均バッファが埋まりきるまではNoneを
+    返す。ここで弾かないと、サンプル数1〜数個のほぼ生値に近い平均が、平均化による
+    保護なしにそのままMaxへ焼き付いてしまう。"""
     if hip_rotation_angle is None:
         return None
 
@@ -326,9 +329,11 @@ def main():
     frame_count   = 0
     display_frame = None
 
+    # 角速度の移動平均：短いウィンドウで一瞬の速い動き(パンチ等)のピークを
+    # 薄めすぎないようにする（長いと素早い回転ほど過小評価されてしまう）
     angle_histories = [
-        deque(maxlen=10),
-        deque(maxlen=10),
+        deque(maxlen=3),
+        deque(maxlen=3),
     ]
     # max_hip_width（正面向きの基準値）算出用：安定性重視の長いウィンドウ
     hip_width_histories_slow = [
