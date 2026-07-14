@@ -220,30 +220,30 @@ def color_for_balance(left_pct):
 
 
 def draw_metrics(frame, rank, width, angular_velocity, body_axis, balance):
-    """腰回転角速度・体軸傾き・重心バランスを画面に数値表示する"""
+    """腰回転角速度・体軸傾き・重心バランスを画面に数値表示する（英語表記、cv2.putTextは日本語非対応のため）"""
     label = f'P{rank + 1}'
     x = 20 if rank == 0 else width - 300
     font, scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2
 
     if angular_velocity is None:
-        text, color = f'{label} 腰回転: ---', GRAY
+        text, color = f'{label} Hip Rot: ---', GRAY
     else:
-        text  = f'{label} 腰回転: {angular_velocity:.1f}°/秒'
+        text  = f'{label} Hip Rot: {angular_velocity:.1f} deg/s'
         color = color_for_angular_velocity(angular_velocity)
     cv2.putText(frame, text, (x, 40), font, scale, color, thickness)
 
     if body_axis is None:
-        text, color = f'{label} 体軸: ---', GRAY
+        text, color = f'{label} Axis: ---', GRAY
     else:
-        text  = f'{label} 体軸: {body_axis:+.1f}°'
+        text  = f'{label} Axis: {body_axis:+.1f} deg'
         color = color_for_body_axis(body_axis)
     cv2.putText(frame, text, (x, 80), font, scale, color, thickness)
 
     if balance is None:
-        text, color = f'{label} 重心: ---', GRAY
+        text, color = f'{label} Balance: ---', GRAY
     else:
         left_pct, right_pct = balance
-        text  = f'{label} 重心: 左{left_pct:.0f}% 右{right_pct:.0f}%'
+        text  = f'{label} Balance: L{left_pct:.0f}% R{right_pct:.0f}%'
         color = color_for_balance(left_pct)
     cv2.putText(frame, text, (x, 120), font, scale, color, thickness)
 
