@@ -153,12 +153,17 @@ def compute_hip_width(kp, conf):
 
 def smooth_hip_width(hip_width, rank, hip_width_histories):
     """腰幅を移動平均（ウィンドウ = hip_width_historiesのmaxlen）で平滑化する。
-    arccosはratio=1（正面向き）付近で微分値が発散し、キーポイント検出の
-    数ピクセルのジッターが角度・角速度に大きく増幅されるため、正規化前に
-    ここで抑える。バッファが埋まりきるまで（トラッキング開始直後の数フレーム）
-    はNoneを返す。ここで弾かないと、平均サンプル数が少ないままの不安定な
-    値がmax_hip_widths / Maxの角速度に混入し、動画冒頭から不当に高い
-    Max値が記録されてしまう。"""
+    バッファが埋まりきるまで（トラッキング開始直後の数フレーム）はNoneを
+    返す。ここで弾かないと、平均サンプル数が少ないままの不安定な値が
+    後段の計算に混入してしまう。
+
+    呼び出し側で2種類の用途に使い分ける：
+    - 長いウィンドウ（例:20フレーム）でmax_hip_width（正面向きの基準値）を
+      算出：arccosはratio=1付近で微分値が発散するため、基準値自体は
+      キーポイント検出のジッターに左右されない安定した値にする必要がある。
+    - 短いウィンドウ（例:5フレーム）で現在の腰幅（角度計算の分子）を算出：
+      基準値と同じ長さで平滑化すると、パンチ等の素早い回転運動まで
+      鈍ってしまうため、応答性を優先して短めにする。"""
     if hip_width is None:
         return None
     hip_width_histories[rank].append(hip_width)
@@ -313,9 +318,15 @@ def main():
         deque(maxlen=10),
         deque(maxlen=10),
     ]
-    hip_width_histories = [
+    # max_hip_width（正面向きの基準値）算出用：安定性重視の長いウィンドウ
+    hip_width_histories_slow = [
         deque(maxlen=20),
         deque(maxlen=20),
+    ]
+    # 現在の腰幅（角度計算の分子）算出用：応答性重視の短いウィンドウ
+    hip_width_histories_fast = [
+        deque(maxlen=5),
+        deque(maxlen=5),
     ]
     prev_angles = [None, None]
     max_angular_velocities  = [0.0, 0.0]
@@ -358,13 +369,15 @@ def main():
                         balance   = compute_balance(kp, conf)
 
                         hip_width = compute_hip_width(kp, conf)
-                        hip_width_smoothed = smooth_hip_width(
-                            hip_width, rank, hip_width_histories)
-                        if hip_width_smoothed is not None:
+                        hip_width_slow = smooth_hip_width(
+                            hip_width, rank, hip_width_histories_slow)
+                        hip_width_fast = smooth_hip_width(
+                            hip_width, rank, hip_width_histories_fast)
+                        if hip_width_slow is not None:
                             max_hip_widths[rank] = max(
-                                max_hip_widths[rank], hip_width_smoothed)
+                                max_hip_widths[rank], hip_width_slow)
                         hip_rotation_angle = compute_hip_rotation_angle(
-                            hip_width_smoothed, max_hip_widths[rank])
+                            hip_width_fast, max_hip_widths[rank])
                         if hip_rotation_angle is not None:
                             max_hip_rotation_angles[rank] = max(
                                 max_hip_rotation_angles[rank], hip_rotation_angle)
