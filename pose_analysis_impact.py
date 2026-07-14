@@ -153,6 +153,25 @@ def update_hip_angular_velocity(angle, fps, rank, prev_angles, angle_histories):
     return sum(angle_histories[rank]) / len(angle_histories[rank])
 
 
+def compute_hip_width(kp, conf):
+    """左右股関節のx座標の差（腰幅）"""
+    if len(kp) <= RIGHT_HIP:
+        return None
+    if conf[LEFT_HIP] <= CONF_THRESH or conf[RIGHT_HIP] <= CONF_THRESH:
+        return None
+    if kp[LEFT_HIP][0] == 0 or kp[RIGHT_HIP][0] == 0:
+        return None
+    return abs(kp[RIGHT_HIP][0] - kp[LEFT_HIP][0])
+
+
+def compute_hip_rotation_angle(hip_width, max_hip_width):
+    """腰幅を最大腰幅で正規化した水平回転角度の近似値（0°=真横、90°=正面）"""
+    if hip_width is None or max_hip_width <= 0:
+        return None
+    rotation_ratio = hip_width / max_hip_width
+    return np.degrees(np.arccos(np.clip(rotation_ratio, 0, 1)))
+
+
 def compute_body_axis_angle(kp, conf):
     """体軸（肩中点→腰中点）の傾き角度（度）。前傾+ / 後傾-"""
     if len(kp) <= RIGHT_HIP:
@@ -201,6 +220,14 @@ def color_for_angular_velocity(angular_velocity):
     return (0, 0, 255)
 
 
+def color_for_hip_rotation_angle(angle):
+    if angle <= 30:
+        return (0, 255, 0)
+    if angle <= 60:
+        return (0, 255, 255)
+    return (0, 0, 255)
+
+
 def color_for_body_axis(angle):
     a = abs(angle)
     if a <= 5:
@@ -219,8 +246,8 @@ def color_for_balance(left_pct):
 
 
 def draw_metrics(frame, rank, width, angular_velocity, max_angular_velocity,
-                  hip_angle, max_hip_angle, body_axis, balance):
-    """腰回転角速度・腰角度・体軸傾き・重心バランスを画面に数値表示する（英語表記、cv2.putTextは日本語非対応のため）"""
+                  hip_rotation_angle, body_axis, balance):
+    """腰回転角速度・腰回転角度・体軸傾き・重心バランスを画面に数値表示する（英語表記、cv2.putTextは日本語非対応のため）"""
     label = f'P{rank + 1}'
     x = 20 if rank == 0 else width - 300
     font, scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2
@@ -233,11 +260,11 @@ def draw_metrics(frame, rank, width, angular_velocity, max_angular_velocity,
         color = color_for_angular_velocity(angular_velocity)
     cv2.putText(frame, text, (x, 40), font, scale, color, thickness)
 
-    if hip_angle is None:
-        text, color = f'{label} Hip Angle: ---', GRAY
+    if hip_rotation_angle is None:
+        text, color = f'{label} Hip Rot Angle: ---', GRAY
     else:
-        text  = f'{label} Hip Angle: {hip_angle:+.1f} deg (Max {max_hip_angle:.1f})'
-        color = (255, 255, 255)
+        text  = f'{label} Hip Rot Angle: {hip_rotation_angle:.1f} deg'
+        color = color_for_hip_rotation_angle(hip_rotation_angle)
     cv2.putText(frame, text, (x, 80), font, scale, color, thickness)
 
     if body_axis is None:
@@ -283,7 +310,7 @@ def main():
     ]
     prev_angles = [None, None]
     max_angular_velocities = [0.0, 0.0]
-    max_hip_angles         = [0.0, 0.0]
+    max_hip_widths         = [0.0, 0.0]
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -323,15 +350,19 @@ def main():
                         body_axis = compute_body_axis_angle(kp, conf)
                         balance   = compute_balance(kp, conf)
 
-                        if hip_angle is not None:
-                            max_hip_angles[rank] = max(max_hip_angles[rank], abs(hip_angle))
+                        hip_width = compute_hip_width(kp, conf)
+                        if hip_width is not None:
+                            max_hip_widths[rank] = max(max_hip_widths[rank], hip_width)
+                        hip_rotation_angle = compute_hip_rotation_angle(
+                            hip_width, max_hip_widths[rank])
+
                         if angular_velocity is not None:
                             max_angular_velocities[rank] = max(
                                 max_angular_velocities[rank], abs(angular_velocity))
 
                         draw_metrics(canvas, rank, width,
                                      angular_velocity, max_angular_velocities[rank],
-                                     hip_angle, max_hip_angles[rank],
+                                     hip_rotation_angle,
                                      body_axis, balance)
 
             display_frame = canvas
