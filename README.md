@@ -17,3 +17,9 @@ python pose_analysis_impact-p.py 動画ファイル名
 ## 関連リポジトリ
 - mma-pose-analysis
 - solo-pose-analysis
+
+## ライセンス
+
+[GNU Affero General Public License v3.0](LICENSE)
+
+本ツールは [Ultralytics YOLO26](https://github.com/ultralytics/ultralytics)（AGPL-3.0）に依存しているため、本リポジトリ全体もAGPL-3.0で公開しています。改変・再配布、およびネットワーク経由での提供（Webサービス化等）を行う場合は、AGPL-3.0の条件に従いソースコードを公開する必要があります。
